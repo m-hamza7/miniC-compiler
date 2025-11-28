@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniC Compiler - JARVIS Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>&micro  C COMPILER</h1>
+            <p class="subtitle">Advanced Compiler Phase Visualization System</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Code Editor Section -->
+            <div class="editor-section">
+                <div class="section-header">
+                    <h2>⌨ SOURCE CODE INPUT</h2>
+                    <div class="button-group">
+                        <button onclick="loadExample()" class="btn btn-secondary">📂 Load Example</button>
+                        <button onclick="clearCode()" class="btn btn-secondary">🗑 Clear</button>
+                        <button onclick="compileCode()" class="btn btn-primary">▶ Compile & Execute</button>
+                    </div>
+                </div>
+                <textarea id="codeInput" placeholder="// Enter your MiniC code here..."></textarea>
+            </div>
+
+            <!-- Status Bar -->
+            <div id="statusBar" class="status-bar hidden"></div>
+
+            <!-- Compiler Phases Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="showTab('lexical', this)">⚙ 1. Lexical Analysis</button>
+                <button class="tab-button" onclick="showTab('syntax', this)">𖣂︎ 2. Syntax Analysis</button>
+                <button class="tab-button" onclick="showTab('semantic', this)">⌕ 3. Semantic Analysis</button>
+                <button class="tab-button" onclick="showTab('output', this)">🖳 4. Output</button>
+            </div>            <!-- Tab Content -->
+            <div class="tab-content-wrapper">
+                <!-- Lexical Analysis Tab -->
+                <div id="lexical" class="tab-content active">
+                    <h3>🔤 TOKEN STREAM</h3>
+                    <div id="tokenStats" class="stats-box"></div>
+                    <div id="tokensTable" class="table-container"></div>
+                </div>
+
+                <!-- Syntax Analysis Tab -->
+                <div id="syntax" class="tab-content">
+                    <h3>🌲 ABSTRACT SYNTAX TREE (AST)</h3>
+                    <div id="astVisualization" class="ast-container">
+                        <pre id="astTree"></pre>
+                    </div>
+                </div>
+
+                <!-- Semantic Analysis Tab -->
+                <div id="semantic" class="tab-content">
+                    <h3>📋 SYMBOL TABLE</h3>
+                    <div id="symbolTable" class="table-container"></div>
+                    
+                    <h3 style="margin-top: 30px;">⚡ FUNCTION TABLE</h3>
+                    <div id="functionTable" class="table-container"></div>
+                    
+                    <div id="semanticIssues" class="issues-container"></div>
+                </div>
+
+                <!-- Output Tab -->
+                <div id="output" class="tab-content">
+                    <h3>💻 PROGRAM OUTPUT</h3>
+                    <div id="programOutput" class="output-box"></div>
+                    
+                    <h3 style="margin-top: 20px;">📈 COMPILATION SUMMARY</h3>
+                    <div id="compilationSummary" class="summary-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>⚡ MiniC Compiler | JARVIS Interface v1.0 | Powered by Python PLY & Flask ⚡</p>
+        </footer>
+    </div>
+
+    <script>        // Example MiniC code
+        const exampleCode = `// === MiniC Compiler Test Program ===
+// Demonstrates lexical, syntax, and semantic analysis
+
+func add(a:int, b:int):int {
+    return a + b;
+}
+
+func factorial(n:int):int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+// Main program execution
+var x:int = 5;
+var y:int = 10;
+var result:int;
+
+result = add(x, y);
+print(result);
+
+var fact:int = factorial(5);
+print(fact);
+
+// End of program`;
+
+        function loadExample() {
+            document.getElementById('codeInput').value = exampleCode;
+        }
+
+        function clearCode() {
+            document.getElementById('codeInput').value = '';
+            clearResults();
+        }
+
+        function clearResults() {
+            document.getElementById('tokensTable').innerHTML = '';
+            document.getElementById('tokenStats').innerHTML = '';
+            document.getElementById('astTree').textContent = '';
+            document.getElementById('symbolTable').innerHTML = '';
+            document.getElementById('functionTable').innerHTML = '';
+            document.getElementById('semanticIssues').innerHTML = '';
+            document.getElementById('programOutput').innerHTML = '';
+            document.getElementById('compilationSummary').innerHTML = '';
+            document.getElementById('statusBar').classList.add('hidden');
+        }
+
+        function showTab(tabName, btn) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Remove active class from buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(b => b.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            if (btn) {
+                // ensure we add the active class to the clicked button
+                btn.classList.add('active');
+            }
+        }
+
+        async function compileCode() {
+            const code = document.getElementById('codeInput').value;
+            
+            if (!code.trim()) {
+                showStatus('Please enter some code to compile', 'error');
+                return;
+            }
+
+            showStatus('Compiling...', 'info');
+            clearResults();
+
+            try {
+                const response = await fetch('/compile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: code })
+                });                const result = await response.json();
+                
+                console.log('Compilation result:', result); // Debug log
+                
+                if (result.success) {
+                    showStatus('✓ Compilation successful!', 'success');
+                } else {
+                    showStatus('✗ Compilation failed with errors', 'error');
+                }
+
+                // Display results - safely handle undefined data
+                displayLexicalAnalysis(result.lexical || {});
+                displaySyntaxAnalysis(result.syntax || {});
+                displaySemanticAnalysis(result.semantic || {});
+                displayOutput(result.output || '', result.errors || [], result.warnings || [], result.success);
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                console.error('Compilation error:', error);
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = message;
+            statusBar.className = 'status-bar ' + type;
+            statusBar.classList.remove('hidden');
+        }        function displayLexicalAnalysis(lexical) {
+            // Safely handle undefined or null lexical data
+            if (!lexical) {
+                document.getElementById('tokenStats').innerHTML = '<p class="no-data">No lexical analysis data available</p>';
+                document.getElementById('tokensTable').innerHTML = '';
+                return;
+            }
+
+            const tokens = lexical.tokens || [];
+            const tokenCount = lexical.token_count || 0;
+            
+            // Display stats
+            const statsHtml = `
+                <div class="stat-item">
+                    <span class="stat-label">🔢 Total Tokens:</span>
+                    <span class="stat-value">${tokenCount}</span>
+                </div>
+            `;
+            document.getElementById('tokenStats').innerHTML = statsHtml;
+
+            // Display tokens table
+            if (tokens.length > 0) {
+                let tableHtml = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Token Type</th>
+                                <th>Value</th>
+                                <th>Line</th>
+                                <th>Position</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                tokens.forEach((token, index) => {
+                    tableHtml += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td><span class="token-type">${token.type}</span></td>
+                            <td><code>${escapeHtml(token.value)}</code></td>
+                            <td>${token.line}</td>
+                            <td>${token.position}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHtml += '</tbody></table>';
+                document.getElementById('tokensTable').innerHTML = tableHtml;
+            } else {
+                document.getElementById('tokensTable').innerHTML = '<p class="no-data">No tokens generated</p>';
+            }            if (lexical.errors && lexical.errors.length > 0) {
+                const errorsHtml = `
+                    <div class="error-box">
+                        <h4>⚠ LEXICAL ERRORS:</h4>
+                        ${lexical.errors.map(err => `<div class="error-item">• ${escapeHtml(err)}</div>`).join('')}
+                    </div>
+                `;
+                document.getElementById('tokensTable').innerHTML += errorsHtml;
+            }
+        }        function displaySyntaxAnalysis(syntax) {
+            // Safely handle undefined or null syntax data
+            if (!syntax) {
+                document.getElementById('astTree').textContent = 'No syntax analysis data available';
+                return;
+            }
+
+            const astJson = syntax.ast_json;
+            
+            if (astJson) {
+                document.getElementById('astTree').textContent = astJson;
+            } else {
+                document.getElementById('astTree').textContent = 'No AST generated';
+            }            if (syntax.errors && syntax.errors.length > 0) {
+                const errorsHtml = `
+                    <div class="error-box">
+                        <h4>⚠ SYNTAX ERRORS:</h4>
+                        ${syntax.errors.map(err => `<div class="error-item">• ${escapeHtml(err)}</div>`).join('')}
+                    </div>
+                `;
+                document.getElementById('astVisualization').innerHTML += errorsHtml;
+            }
+        }        function displaySemanticAnalysis(semantic) {
+            // Safely handle undefined or null semantic data
+            if (!semantic) {
+                document.getElementById('symbolTable').innerHTML = '<p class="no-data">No semantic analysis data available</p>';
+                document.getElementById('functionTable').innerHTML = '<p class="no-data">No semantic analysis data available</p>';
+                document.getElementById('semanticIssues').innerHTML = '';
+                return;
+            }
+
+            const symbolTable = semantic.symbol_table || [];
+            const functionTable = semantic.function_table || {};
+            const errors = semantic.errors || [];
+            const warnings = semantic.warnings || [];
+
+            // Display symbol table
+            if (symbolTable.length > 0) {
+                let tableHtml = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Scope</th>
+                                <th>Kind</th>
+                                <th>Initialized</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                symbolTable.forEach(symbol => {
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${escapeHtml(symbol.name)}</strong></td>
+                            <td><span class="type-badge">${symbol.type}</span></td>
+                            <td>${symbol.scope}</td>
+                            <td>${symbol.kind}</td>
+                            <td>${symbol.initialized ? '✓' : '✗'}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHtml += '</tbody></table>';
+                document.getElementById('symbolTable').innerHTML = tableHtml;
+            } else {
+                document.getElementById('symbolTable').innerHTML = '<p class="no-data">No symbols in table</p>';
+            }
+
+            // Display function table
+            if (Object.keys(functionTable).length > 0) {
+                let funcTableHtml = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Function Name</th>
+                                <th>Parameters</th>
+                                <th>Return Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                for (const [name, func] of Object.entries(functionTable)) {
+                    const params = func.params.map(p => `${p.name}:${p.type}`).join(', ');
+                    funcTableHtml += `
+                        <tr>
+                            <td><strong>${escapeHtml(name)}</strong></td>
+                            <td><code>${escapeHtml(params)}</code></td>
+                            <td><span class="type-badge">${func.return_type}</span></td>
+                        </tr>
+                    `;
+                }
+
+                funcTableHtml += '</tbody></table>';
+                document.getElementById('functionTable').innerHTML = funcTableHtml;
+            } else {
+                document.getElementById('functionTable').innerHTML = '<p class="no-data">No functions declared</p>';
+            }            // Display errors and warnings
+            let issuesHtml = '';
+            if (errors.length > 0) {
+                issuesHtml += `
+                    <div class="error-box">
+                        <h4>⚠ SEMANTIC ERRORS:</h4>
+                        ${errors.map(err => `<div class="error-item">• ${escapeHtml(err)}</div>`).join('')}
+                    </div>
+                `;
+            }
+            if (warnings.length > 0) {
+                issuesHtml += `
+                    <div class="warning-box">
+                        <h4>⚡ WARNINGS:</h4>
+                        ${warnings.map(warn => `<div class="warning-item">• ${escapeHtml(warn)}</div>`).join('')}
+                    </div>
+                `;
+            }
+            document.getElementById('semanticIssues').innerHTML = issuesHtml;
+        }
+
+        function displayOutput(output, errors, warnings, success) {
+            // Display program output
+            if (output) {
+                document.getElementById('programOutput').innerHTML = `<pre>${escapeHtml(output)}</pre>`;
+            } else {
+                document.getElementById('programOutput').innerHTML = '<p class="no-data">No output generated</p>';
+            }
+
+            // Display summary
+            let summaryHtml = `
+                <div class="summary-grid">
+                    <div class="summary-item ${success ? 'success' : 'error'}">
+                        <div class="summary-label">Status</div>
+                        <div class="summary-value">${success ? '✓ Success' : '✗ Failed'}</div>
+                    </div>
+                    <div class="summary-item ${errors.length > 0 ? 'error' : 'success'}">
+                        <div class="summary-label">Errors</div>
+                        <div class="summary-value">${errors.length}</div>
+                    </div>
+                    <div class="summary-item ${warnings.length > 0 ? 'warning' : 'success'}">
+                        <div class="summary-label">Warnings</div>
+                        <div class="summary-value">${warnings.length}</div>
+                    </div>
+                </div>
+            `;            if (errors.length > 0) {
+                summaryHtml += `
+                    <div class="error-box" style="margin-top: 15px;">
+                        <h4>⚠ ALL ERRORS:</h4>
+                        ${errors.map(err => `<div class="error-item">• ${escapeHtml(err)}</div>`).join('')}
+                    </div>
+                `;
+            }
+
+            if (warnings.length > 0) {
+                summaryHtml += `
+                    <div class="warning-box" style="margin-top: 15px;">
+                        <h4>⚡ ALL WARNINGS:</h4>
+                        ${warnings.map(warn => `<div class="warning-item">• ${escapeHtml(warn)}</div>`).join('')}
+                    </div>
+                `;
+            }
+
+            document.getElementById('compilationSummary').innerHTML = summaryHtml;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load example on page load
+        window.onload = function() {
+            loadExample();
+        };
+    </script>
+</body>
+</html>
