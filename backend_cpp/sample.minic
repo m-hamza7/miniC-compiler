@@ -1,0 +1,29 @@
+﻿func fibb(n:int):int{
+
+   if(n==0)
+   {
+
+      return 0;
+
+   }   
+   if(n==1)
+   {
+
+      return 1;
+
+   }
+
+   return fibb(n-1)+fibb(n-2);
+
+}
+
+
+var i:int = 0;
+var n:int = 5;
+
+while(i<=n)
+{
+   var x:int = fibb(i);
+   print(x);
+   i=i+1;
+}
