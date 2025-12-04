@@ -10,8 +10,6 @@
 
 using namespace std;
 
-// Handwritten MiniC compiler backend (lexer, parser, AST, semantic, interpreter)
-// Single-file implementation. Reads source from stdin and writes JSON to stdout.
 
 struct Token {
     string type;
@@ -355,6 +353,237 @@ struct FunctionInfo {
     shared_ptr<AST> body;
 };
 
+// Semantic analyzer: performs a static AST walk and emits errors/warnings
+class SemanticAnalyzer {
+public:
+    shared_ptr<AST> ast;
+    // Reference to the interpreter's symbol/function tables collected earlier
+    unordered_map<string, Value::Type> globals;
+    const unordered_map<string, FunctionInfo>* functions = nullptr;
+
+    vector<string> errors;
+    vector<string> warnings;
+
+    SemanticAnalyzer(const shared_ptr<AST> &a, const unordered_map<string, Value::Type> &g, const unordered_map<string, FunctionInfo> &f)
+        : ast(a), globals(g), functions(&f) {}
+
+    static Value::Type literal_type(const string &s) {
+        if (s=="true"||s=="false") return Value::BOOL;
+        if (s.find('.')!=string::npos) return Value::FLOAT;
+        return Value::INT;
+    }
+    static string type_to_string(Value::Type t) {
+        if (t==Value::INT) return "int";
+        if (t==Value::FLOAT) return "float";
+        if (t==Value::BOOL) return "bool";
+        return "none";
+    }
+    static bool compatible(Value::Type expected, Value::Type actual) {
+        if (expected==Value::NONE || actual==Value::NONE) return false;
+        if (expected==actual) return true;
+        // allow implicit int -> float promotion
+        if (expected==Value::FLOAT && actual==Value::INT) return true;
+        return false;
+    }
+
+    Value::Type string_to_type(const string &s) const {
+        if (s=="int") return Value::INT;
+        if (s=="float") return Value::FLOAT;
+        if (s=="bool") return Value::BOOL;
+        return Value::NONE;
+    }
+
+    // Infer expression type given a local scope (params + local vars)
+    Value::Type infer_expr_type(const shared_ptr<AST> &node, const unordered_map<string, Value::Type> &locals) {
+        if (!node) return Value::NONE;
+        if (node->node_type=="Literal") return literal_type(node->value);
+        if (node->node_type=="Identifier") {
+            auto it = locals.find(node->value); if (it!=locals.end()) return it->second;
+            auto git = globals.find(node->value); if (git!=globals.end()) return git->second;
+            errors.push_back("Undefined identifier '" + node->value + "'");
+            return Value::NONE;
+        }
+        if (node->node_type=="Call") {
+            string fname = node->value;
+            if (fname=="print") return Value::NONE; // print returns none
+            auto fit = functions->find(fname);
+            if (fit==functions->end()) { errors.push_back("Call to undefined function '" + fname + "'"); return Value::NONE; }
+            auto &fi = fit->second;
+            if (node->children.size() != fi.params.size()) {
+                errors.push_back("Argument count mismatch in call to '" + fname + "'");
+            }
+            for (size_t i=0;i<node->children.size() && i<fi.params.size();++i) {
+                Value::Type at = infer_expr_type(node->children[i], locals);
+                Value::Type pt = string_to_type(fi.params[i].second);
+                if (at==Value::NONE) continue;
+                if (!compatible(pt, at)) {
+                    errors.push_back("Argument " + to_string(i+1) + " type mismatch in call to '" + fname + "': expected " + type_to_string(pt) + ", got " + type_to_string(at));
+                }
+            }
+            return string_to_type(fi.return_type);
+        }
+        if (node->node_type=="BinaryOp") {
+            string op = node->value;
+            Value::Type L = infer_expr_type(node->children[0], locals);
+            Value::Type R = infer_expr_type(node->children[1], locals);
+            if (L==Value::NONE || R==Value::NONE) return Value::NONE;
+            if (op=="+"||op=="-"||op=="*"||op=="/") {
+                // arithmetic: require numeric
+                if ((L==Value::BOOL) || (R==Value::BOOL)) { errors.push_back("Invalid operand type for arithmetic operator '"+op+"'"); return Value::NONE; }
+                if (L==Value::FLOAT || R==Value::FLOAT) return Value::FLOAT; return Value::INT;
+            }
+            if (op=="<"||op==">"||op=="<="||op==">=") {
+                if ((L==Value::BOOL) || (R==Value::BOOL)) { errors.push_back("Invalid operand type for relational operator '"+op+"'"); return Value::NONE; }
+                return Value::BOOL;
+            }
+            if (op=="=="||op=="!=") {
+                // allow comparisons between numeric types or booleans
+                if ((L==Value::BOOL) != (R==Value::BOOL)) {
+                    // comparing bool to numeric allowed by interpreter (coercion), but warn
+                    warnings.push_back("Comparison between boolean and numeric in '" + op + "'");
+                }
+                return Value::BOOL;
+            }
+            if (op=="&&"||op=="||") {
+                // logical: operands should be boolean (or at least coercible)
+                if (L!=Value::BOOL && L!=Value::INT && L!=Value::FLOAT) { errors.push_back("Invalid operand for logical operator '"+op+"'"); return Value::NONE; }
+                if (R!=Value::BOOL && R!=Value::INT && R!=Value::FLOAT) { errors.push_back("Invalid operand for logical operator '"+op+"'"); return Value::NONE; }
+                return Value::BOOL;
+            }
+            return Value::NONE;
+        }
+        if (node->node_type=="UnaryOp") {
+            string op = node->value;
+            Value::Type V = infer_expr_type(node->children[0], locals);
+            if (V==Value::NONE) return Value::NONE;
+            if (op=="-") {
+                if (V==Value::BOOL) { errors.push_back("Invalid operand type for unary '-' on boolean"); return Value::NONE; }
+                return (V==Value::FLOAT?Value::FLOAT:Value::INT);
+            }
+            if (op=="!") return Value::BOOL;
+        }
+        if (node->node_type=="Assign") {
+            // assignment is treated at statement level; here infer RHS
+            return infer_expr_type(node->children[0], locals);
+        }
+        // fallback
+        return Value::NONE;
+    }
+
+    void analyze_var_decl(const shared_ptr<AST> &node, unordered_map<string, Value::Type> &locals, const string &context_name) {
+        if (!node) return;
+        string name = node->value;
+        string t = node->children[0]->node_type;
+        Value::Type vt = string_to_type(t);
+        if (vt==Value::NONE) { errors.push_back("Unknown type for variable '" + name + "'"); return; }
+        if (locals.count(name)) { errors.push_back("Redeclaration of variable '" + name + "' in " + context_name); return; }
+        locals[name] = vt;
+        if (node->children.size()>=2) {
+            Value::Type rhs = infer_expr_type(node->children[1], locals);
+            if (rhs!=Value::NONE && !compatible(vt, rhs)) {
+                errors.push_back("Type mismatch in initializer for '" + name + "': expected " + type_to_string(vt) + ", got " + type_to_string(rhs));
+            }
+        }
+    }
+
+    void analyze_statement(const shared_ptr<AST> &st, unordered_map<string, Value::Type> &locals, const string &current_ret_type) {
+        if (!st) return;
+        if (st->node_type=="VarDecl") { analyze_var_decl(st, locals, "function"); return; }
+        if (st->node_type=="Assign") {
+            string name = st->value;
+            if (!locals.count(name) && !globals.count(name)) { errors.push_back("Assignment to undeclared variable '" + name + "'"); }
+            Value::Type rhs = infer_expr_type(st->children[0], locals);
+            Value::Type dest = locals.count(name)?locals[name]:(globals.count(name)?globals[name]:Value::NONE);
+            if (rhs!=Value::NONE && dest!=Value::NONE && !compatible(dest, rhs)) {
+                errors.push_back("Type mismatch in assignment to '" + name + "': expected " + type_to_string(dest) + ", got " + type_to_string(rhs));
+            }
+            return;
+        }
+        if (st->node_type=="Print") { if (!st->children.empty()) infer_expr_type(st->children[0], locals); return; }
+        if (st->node_type=="If") {
+            infer_expr_type(st->children[0], locals);
+            // then block
+            for (auto &s : st->children[1]->children) analyze_statement(s, locals, current_ret_type);
+            if (st->children.size()>=3) for (auto &s : st->children[2]->children) analyze_statement(s, locals, current_ret_type);
+            return;
+        }
+        if (st->node_type=="While") {
+            infer_expr_type(st->children[0], locals);
+            for (auto &s : st->children[1]->children) analyze_statement(s, locals, current_ret_type);
+            return;
+        }
+        if (st->node_type=="For") {
+            // children: init?, cond?, post?, body
+            if (st->children.size()>=1 && st->children[0]) {
+                if (st->children[0]->node_type=="VarDecl") analyze_var_decl(st->children[0], locals, "for-loop");
+                else infer_expr_type(st->children[0], locals);
+            }
+            if (st->children.size()>=2 && st->children[1]) infer_expr_type(st->children[1], locals);
+            if (st->children.size()>=3 && st->children[2]) infer_expr_type(st->children[2], locals);
+            if (!st->children.empty()) for (auto &s : st->children.back()->children) analyze_statement(s, locals, current_ret_type);
+            return;
+        }
+        if (st->node_type=="Return") {
+            if (!st->children.empty()) {
+                Value::Type rv = infer_expr_type(st->children[0], locals);
+                Value::Type declared = string_to_type(current_ret_type);
+                if (rv!=Value::NONE && declared!=Value::NONE && !compatible(declared, rv)) {
+                    errors.push_back("Return type mismatch: function expects " + type_to_string(declared) + ", returned " + type_to_string(rv));
+                }
+            } else {
+                // void/none return: if function declares non-none return type, error
+                Value::Type declared = string_to_type(current_ret_type);
+                if (declared!=Value::NONE) errors.push_back("Missing return value in function that declares return type '" + current_ret_type + "'");
+            }
+            return;
+        }
+        if (st->node_type=="Block") {
+            for (auto &s : st->children) analyze_statement(s, locals, current_ret_type);
+            return;
+        }
+        // expression statements
+        infer_expr_type(st, locals);
+    }
+
+    void analyze_function(const FunctionInfo &fi) {
+        // build local scope from params and vardecls in the immediate body
+        unordered_map<string, Value::Type> locals;
+        for (auto &p : fi.params) {
+            Value::Type pt = string_to_type(p.second);
+            if (pt==Value::NONE) { errors.push_back("Unknown parameter type for '" + p.first + "' in function '" + fi.name + "'"); }
+            if (locals.count(p.first)) { errors.push_back("Duplicate parameter name '" + p.first + "' in function '" + fi.name + "'"); }
+            locals[p.first] = pt;
+        }
+        // collect var declarations at function body top-level (simple approach)
+        for (auto &st : fi.body->children) {
+            if (st->node_type=="VarDecl") {
+                string vname = st->value; string t = st->children[0]->node_type; Value::Type vt = string_to_type(t);
+                if (locals.count(vname)) warnings.push_back("Shadowing/redeclaration of '" + vname + "' in function '" + fi.name + "'");
+                locals[vname] = vt;
+            }
+        }
+        // analyze statements now
+        for (auto &st : fi.body->children) analyze_statement(st, locals, fi.return_type);
+    }
+
+    void run() {
+        if (!ast) return;
+        // top-level: check global var initializers
+        for (auto &child : ast->children) {
+            if (child->node_type=="VarDecl") {
+                string name = child->value; string t = child->children[0]->node_type; Value::Type vt = string_to_type(t);
+                if (child->children.size()>=2) {
+                    unordered_map<string, Value::Type> globals_copy = globals; // allow reading other globals
+                    Value::Type rhs = infer_expr_type(child->children[1], globals_copy);
+                    if (rhs!=Value::NONE && !compatible(vt, rhs)) errors.push_back("Type mismatch in initializer for global '" + name + "': expected " + type_to_string(vt) + ", got " + type_to_string(rhs));
+                }
+            }
+        }
+        // functions
+        for (auto &kv : *functions) analyze_function(kv.second);
+    }
+};
+
 struct Interpreter {
     shared_ptr<AST> ast;
     vector<string> errors;
@@ -478,7 +707,7 @@ struct Interpreter {
                 else if (op==">") out.b = lv > rv;
                 else if (op=="<=") out.b = lv <= rv;
                 else out.b = lv >= rv;
-            } else if (op=="==" || op=="!=") {
+            } else if (op=="==" || op!="") {
                 out.type = Value::BOOL;
                 if (L.type==Value::BOOL || R.type==Value::BOOL) {
                     bool lb = (L.type==Value::BOOL?L.b:(L.type==Value::FLOAT?L.f!=0.0:L.i!=0));
@@ -608,10 +837,17 @@ int main() {
 
     interp.collect_decls();
 
-    for (auto &child : ast->children) {
-        if (child->node_type=="FunctionDecl") continue;
-        interp.execute_statement(child);
-        if (!interp.errors.empty()) break;
+    SemanticAnalyzer analyzer(ast, interp.globals, interp.functions);
+    analyzer.run();
+    interp.errors.insert(interp.errors.end(), analyzer.errors.begin(), analyzer.errors.end());
+    interp.warnings.insert(interp.warnings.end(), analyzer.warnings.begin(), analyzer.warnings.end());
+
+    if (interp.errors.empty()) {
+        for (auto &child : ast->children) {
+            if (child->node_type=="FunctionDecl") continue;
+            interp.execute_statement(child);
+            if (!interp.errors.empty()) break;
+        }
     }
 
     ostringstream out;

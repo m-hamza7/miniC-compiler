@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MiniC Compiler — Course Report</title>
+  <style>
+    body{font-family:Segoe UI,Arial,Helvetica,sans-serif;margin:40px;color:#111}
+    h1,h2,h3{color:#0b4f6c}
+    pre{background:#f5f5f5;border:1px solid #ddd;padding:12px;overflow:auto}
+    code{background:#f0f0f0;padding:2px 4px;border-radius:4px}
+    .section{margin-bottom:18px}
+  </style>
+</head>
+<body>
+  <h1>MiniC Compiler — Course Report</h1>
+  <p><em>Prepared for: Compiler Construction</em></p>
+
+  <div class="section">
+    <h2>1. Abstract</h2>
+    <p>MiniC is an educational compiler front‑end for a small C‑like language. The project implements a full front‑end pipeline (lexical, syntax, semantic) and a small interpreter, and exposes an interactive Flask web UI that visualizes tokens, AST, symbol/function tables, diagnostics and runtime output. A handwritten single‑file C++ backend provides the primary compilation/execution engine; a Python implementation is kept as a fallback/reference.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Goals &amp; Scope</h2>
+    <ul>
+      <li>Teach compiler front‑end concepts via a compact, runnable system.</li>
+      <li>Provide phase visualizations for students to inspect tokens, AST and symbol/function tables.</li>
+      <li>Offer a lightweight interpreter to run valid MiniC programs.</li>
+      <li>Make a portable native backend (C++) while keeping a Python reference implementation.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>3. Repository Structure (high level)</h2>
+    <ul>
+      <li><code>app.py</code> — Flask app and /compile route (calls C++ exe or falls back to Python)</li>
+      <li><code>minic_compiler_new.py</code> — Python compiler (reference/fallback)</li>
+      <li><code>backend_cpp/</code> — C++ backend sources, build scripts and samples</li>
+      <li><code>templates/index.html</code>, <code>static/style.css</code> — Web UI</li>
+      <li>Documentation: <code>README.md</code>, <code>THEME_CHANGES.md</code></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>4. Language Overview (MiniC)</h2>
+    <p>Minimal C‑like language with:</p>
+    <ul>
+      <li>Types: <code>int</code>, <code>float</code>, <code>bool</code></li>
+      <li>Declarations: <code>var name:type [= expr];</code></li>
+      <li>Functions: <code>func name(params):ret_type { ... }</code></li>
+      <li>Control: <code>if/else</code>, <code>while</code>, <code>for</code>, <code>return</code></li>
+      <li>Builtin: <code>print(expr)</code></li>
+      <li>Expressions: operators with precedence (||, &&, ==/!=, &lt;,&gt;, <=, >=, +/-, *, /, unary - and !)</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>5. Design &amp; Implementation</h2>
+    <ul>
+      <li><strong>Lexer</strong>: handwritten scanner in C++ that produces a token stream; includes UTF‑8 BOM stripping.</li>
+      <li><strong>Parser</strong>: recursive‑descent with precedence layers producing an AST.</li>
+      <li><strong>AST</strong>: lightweight tree nodes serialized to JSON for UI consumption.</li>
+      <li><strong>Semantic</strong>: collects symbol and function tables and performs basic checks.</li>
+      <li><strong>Interpreter</strong>: minimal frames, local/global storage, function calls, builtin <code>print</code>.</li>
+      <li><strong>Error handling</strong>: lexer/parser/interpreter report diagnostics collected into the JSON output.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>6. C++ Backend Notes</h2>
+    <p>The C++ backend is a single file at <code>backend_cpp/main.cpp</code>. It reads source from stdin and writes a JSON object to stdout with these fields: <code>tokens</code>, <code>ast</code>, <code>symbol_table</code>, <code>function_table</code>, <code>errors</code>, <code>warnings</code>, <code>output</code>.</p>
+  </div>
+
+  <div class="section">
+    <h2>7. Python Backend</h2>
+    <p><code>minic_compiler_new.py</code> remains as a working reference and fallback used by <code>app.py</code> when the C++ executable is unavailable.</p>
+  </div>
+
+  <div class="section">
+    <h2>8. Web UI</h2>
+    <p>The Flask UI posts source to <code>/compile</code>; the server returns JSON produced by either the C++ or Python backend. The UI presents:</p>
+    <ul>
+      <li>Lexical tab: token list and stats</li>
+      <li>Syntax tab: pretty AST JSON</li>
+      <li>Semantic tab: symbol and function tables and issues</li>
+      <li>Output tab: program stdout and compilation summary</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>9. Build &amp; Run (summary)</h2>
+    <p><strong>Recommended (MSYS2 MinGW64)</strong></p>
+    <pre><code># in MSYS2 MINGW64 shell
+pacman -Syu
+pacman -S --needed mingw-w64-x86_64-toolchain
+cd /f/F/BCS-7E/CC/miniC/backend_cpp
+g++ -std=c++17 -O2 -Wall -Wextra main.cpp -o minic_backend.exe
+./minic_backend.exe &lt; sample.minic &gt; result.json
+
+# Start Flask (PowerShell)
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python app.py
+</code></pre>
+  </div>
+
+  <div class="section">
+    <h2>10. Example Result (Fibonacci sample)</h2>
+    <p>The sample run produced the output lines: <code>0\n1\n1\n2\n3\n5\n</code>. Token stream, AST and tables were written to <code>backend_cpp/results.json</code>.</p>
+  </div>
+
+  <div class="section">
+    <h2>11. Testing &amp; Validation</h2>
+    <ul>
+      <li>Manual tests included <code>sample.minic</code> (factorial, fibonacci, loops).</li>
+      <li>Recommend adding an automated test harness that diffs C++ JSON output vs Python JSON output for a suite of programs.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>12. Known Limitations</h2>
+    <ul>
+      <li>Small type system; runtime coercions between int/float.</li>
+      <li>Limited diagnostics and error source locations.</li>
+      <li>Single-file C++ backend for pedagogy rather than modularity.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>13. Future Work</h2>
+    <ul>
+      <li>Unit tests and CI that compare C++ and Python outputs.</li>
+      <li>Improved type checking and error reporting with locations.</li>
+      <li>Additional language features (strings, arrays).</li>
+      <li>Refactor C++ backend into modules and add test harness.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>14. Appendix — Key Commands</h2>
+    <pre><code># Verify MSYS variant
+echo $MSYSTEM
+
+# Build from MINGW64
+g++ -std=c++17 -O2 main.cpp -o minic_backend.exe
+
+# Run in PowerShell (Flask)
+python app.py
+</code></pre>
+  </div>
+
+  <div class="section">
+    <h2>15. Files to Inspect</h2>
+    <ul>
+      <li><code>backend_cpp/main.cpp</code>, <code>backend_cpp/sample.minic</code>, <code>backend_cpp/results.json</code></li>
+      <li><code>app.py</code>, <code>minic_compiler_new.py</code></li>
+      <li><code>templates/index.html</code>, <code>static/style.css</code></li>
+    </ul>
+  </div>
+
+  <footer>
+    <p style="font-size:0.9em;color:#666">Generated: December 3, 2025</p>
+  </footer>
+</body>
+</html>

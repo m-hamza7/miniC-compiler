@@ -1,29 +1,13 @@
-﻿func fibb(n:int):int{
+﻿var x:int = 10;
+var y:int;
+var z:int = 5;
 
-   if(n==0)
-   {
-
-      return 0;
-
-   }   
-   if(n==1)
-   {
-
-      return 1;
-
-   }
-
-   return fibb(n-1)+fibb(n-2);
-
+if (x > 5) {
+    y = z + 3;    //z is NOT declared
 }
 
+print(y);
 
-var i:int = 0;
-var n:int = 5;
+x= 20;       //redeclaration of x
 
-while(i<=n)
-{
-   var x:int = fibb(i);
-   print(x);
-   i=i+1;
-}
+var a:int = 5;            //a was never declared

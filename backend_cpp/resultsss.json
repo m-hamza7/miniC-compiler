@@ -1,0 +1,162 @@
+{
+  "tokens": [
+    {"type": "VAR", "text": "var", "line": 1, "pos": 0},
+    {"type": "IDENTIFIER", "text": "x", "line": 1, "pos": 4},
+    {"type": ":", "text": ":", "line": 1, "pos": 5},
+    {"type": "INT", "text": "int", "line": 1, "pos": 6},
+    {"type": "=", "text": "=", "line": 1, "pos": 10},
+    {"type": "NUMBER", "text": "10", "line": 1, "pos": 12},
+    {"type": ";", "text": ";", "line": 1, "pos": 14},
+    {"type": "VAR", "text": "var", "line": 2, "pos": 16},
+    {"type": "IDENTIFIER", "text": "y", "line": 2, "pos": 20},
+    {"type": ":", "text": ":", "line": 2, "pos": 21},
+    {"type": "INT", "text": "int", "line": 2, "pos": 22},
+    {"type": ";", "text": ";", "line": 2, "pos": 25},
+    {"type": "IF", "text": "if", "line": 4, "pos": 28},
+    {"type": "(", "text": "(", "line": 4, "pos": 31},
+    {"type": "IDENTIFIER", "text": "x", "line": 4, "pos": 32},
+    {"type": ">", "text": ">", "line": 4, "pos": 34},
+    {"type": "NUMBER", "text": "5", "line": 4, "pos": 36},
+    {"type": ")", "text": ")", "line": 4, "pos": 37},
+    {"type": "{", "text": "{", "line": 4, "pos": 39},
+    {"type": "IDENTIFIER", "text": "y", "line": 5, "pos": 45},
+    {"type": "=", "text": "=", "line": 5, "pos": 47},
+    {"type": "IDENTIFIER", "text": "z", "line": 5, "pos": 49},
+    {"type": "+", "text": "+", "line": 5, "pos": 51},
+    {"type": "NUMBER", "text": "3", "line": 5, "pos": 53},
+    {"type": ";", "text": ";", "line": 5, "pos": 54},
+    {"type": "}", "text": "}", "line": 6, "pos": 79},
+    {"type": "PRINT", "text": "print", "line": 8, "pos": 82},
+    {"type": "(", "text": "(", "line": 8, "pos": 87},
+    {"type": "IDENTIFIER", "text": "y", "line": 8, "pos": 88},
+    {"type": ")", "text": ")", "line": 8, "pos": 89},
+    {"type": ";", "text": ";", "line": 8, "pos": 90},
+    {"type": "VAR", "text": "var", "line": 10, "pos": 93},
+    {"type": "IDENTIFIER", "text": "x", "line": 10, "pos": 97},
+    {"type": ":", "text": ":", "line": 10, "pos": 98},
+    {"type": "INT", "text": "int", "line": 10, "pos": 99},
+    {"type": "=", "text": "=", "line": 10, "pos": 103},
+    {"type": "NUMBER", "text": "20", "line": 10, "pos": 105},
+    {"type": ";", "text": ";", "line": 10, "pos": 107},
+    {"type": "IDENTIFIER", "text": "a", "line": 12, "pos": 137},
+    {"type": "=", "text": "=", "line": 12, "pos": 139},
+    {"type": "NUMBER", "text": "5", "line": 12, "pos": 141},
+    {"type": ";", "text": ";", "line": 12, "pos": 142}
+  ],
+  "ast": {
+    "type": "Program",
+    "children": [
+      {
+        "type": "VarDecl",
+        "value": "x",
+        "children": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "Literal",
+            "value": "10"
+          }
+        ]
+      },
+      {
+        "type": "VarDecl",
+        "value": "y",
+        "children": [
+          {
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "type": "If",
+        "children": [
+          {
+            "type": "BinaryOp",
+            "value": ">",
+            "children": [
+              {
+                "type": "Identifier",
+                "value": "x"
+              },
+              {
+                "type": "Literal",
+                "value": "5"
+              }
+            ]
+          },
+          {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Assign",
+                "value": "y",
+                "children": [
+                  {
+                    "type": "BinaryOp",
+                    "value": "+",
+                    "children": [
+                      {
+                        "type": "Identifier",
+                        "value": "z"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": "3"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Print",
+        "children": [
+          {
+            "type": "Identifier",
+            "value": "y"
+          }
+        ]
+      },
+      {
+        "type": "VarDecl",
+        "value": "x",
+        "children": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "Literal",
+            "value": "20"
+          }
+        ]
+      },
+      {
+        "type": "Assign",
+        "value": "a",
+        "children": [
+          {
+            "type": "Literal",
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  "symbol_table": {
+    "y": "int",
+    "x": "int"
+  },
+  "function_table": {
+  },
+  "errors": [
+    "Undefined variable: z"
+  ],
+  "warnings": [
+    "Redeclaration of variable x"
+  ],
+  "output": ""
+}

@@ -1,0 +1,182 @@
+{
+  "tokens": [
+    {"type": "VAR", "text": "var", "line": 1, "pos": 0},
+    {"type": "IDENTIFIER", "text": "x", "line": 1, "pos": 4},
+    {"type": ":", "text": ":", "line": 1, "pos": 5},
+    {"type": "INT", "text": "int", "line": 1, "pos": 6},
+    {"type": "=", "text": "=", "line": 1, "pos": 10},
+    {"type": "NUMBER", "text": "10", "line": 1, "pos": 12},
+    {"type": ";", "text": ";", "line": 1, "pos": 14},
+    {"type": "VAR", "text": "var", "line": 2, "pos": 16},
+    {"type": "IDENTIFIER", "text": "y", "line": 2, "pos": 20},
+    {"type": ":", "text": ":", "line": 2, "pos": 21},
+    {"type": "INT", "text": "int", "line": 2, "pos": 22},
+    {"type": ";", "text": ";", "line": 2, "pos": 25},
+    {"type": "VAR", "text": "var", "line": 3, "pos": 27},
+    {"type": "IDENTIFIER", "text": "z", "line": 3, "pos": 31},
+    {"type": ":", "text": ":", "line": 3, "pos": 32},
+    {"type": "INT", "text": "int", "line": 3, "pos": 33},
+    {"type": "=", "text": "=", "line": 3, "pos": 37},
+    {"type": "NUMBER", "text": "5", "line": 3, "pos": 39},
+    {"type": ";", "text": ";", "line": 3, "pos": 40},
+    {"type": "IF", "text": "if", "line": 5, "pos": 43},
+    {"type": "(", "text": "(", "line": 5, "pos": 46},
+    {"type": "IDENTIFIER", "text": "x", "line": 5, "pos": 47},
+    {"type": ">", "text": ">", "line": 5, "pos": 49},
+    {"type": "NUMBER", "text": "5", "line": 5, "pos": 51},
+    {"type": ")", "text": ")", "line": 5, "pos": 52},
+    {"type": "{", "text": "{", "line": 5, "pos": 54},
+    {"type": "IDENTIFIER", "text": "y", "line": 6, "pos": 60},
+    {"type": "=", "text": "=", "line": 6, "pos": 62},
+    {"type": "IDENTIFIER", "text": "z", "line": 6, "pos": 64},
+    {"type": "+", "text": "+", "line": 6, "pos": 66},
+    {"type": "NUMBER", "text": "3", "line": 6, "pos": 68},
+    {"type": ";", "text": ";", "line": 6, "pos": 69},
+    {"type": "}", "text": "}", "line": 7, "pos": 94},
+    {"type": "PRINT", "text": "print", "line": 9, "pos": 97},
+    {"type": "(", "text": "(", "line": 9, "pos": 102},
+    {"type": "IDENTIFIER", "text": "y", "line": 9, "pos": 103},
+    {"type": ")", "text": ")", "line": 9, "pos": 104},
+    {"type": ";", "text": ";", "line": 9, "pos": 105},
+    {"type": "IDENTIFIER", "text": "x", "line": 11, "pos": 108},
+    {"type": "=", "text": "=", "line": 11, "pos": 109},
+    {"type": "NUMBER", "text": "20", "line": 11, "pos": 111},
+    {"type": ";", "text": ";", "line": 11, "pos": 113},
+    {"type": "VAR", "text": "var", "line": 13, "pos": 143},
+    {"type": "IDENTIFIER", "text": "a", "line": 13, "pos": 147},
+    {"type": ":", "text": ":", "line": 13, "pos": 148},
+    {"type": "INT", "text": "int", "line": 13, "pos": 149},
+    {"type": "=", "text": "=", "line": 13, "pos": 153},
+    {"type": "NUMBER", "text": "5", "line": 13, "pos": 155},
+    {"type": ";", "text": ";", "line": 13, "pos": 156}
+  ],
+  "ast": {
+    "type": "Program",
+    "children": [
+      {
+        "type": "VarDecl",
+        "value": "x",
+        "children": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "Literal",
+            "value": "10"
+          }
+        ]
+      },
+      {
+        "type": "VarDecl",
+        "value": "y",
+        "children": [
+          {
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "type": "VarDecl",
+        "value": "z",
+        "children": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "Literal",
+            "value": "5"
+          }
+        ]
+      },
+      {
+        "type": "If",
+        "children": [
+          {
+            "type": "BinaryOp",
+            "value": ">",
+            "children": [
+              {
+                "type": "Identifier",
+                "value": "x"
+              },
+              {
+                "type": "Literal",
+                "value": "5"
+              }
+            ]
+          },
+          {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Assign",
+                "value": "y",
+                "children": [
+                  {
+                    "type": "BinaryOp",
+                    "value": "+",
+                    "children": [
+                      {
+                        "type": "Identifier",
+                        "value": "z"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": "3"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Print",
+        "children": [
+          {
+            "type": "Identifier",
+            "value": "y"
+          }
+        ]
+      },
+      {
+        "type": "Assign",
+        "value": "x",
+        "children": [
+          {
+            "type": "Literal",
+            "value": "20"
+          }
+        ]
+      },
+      {
+        "type": "VarDecl",
+        "value": "a",
+        "children": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "Literal",
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  "symbol_table": {
+    "a": "int",
+    "z": "int",
+    "y": "int",
+    "x": "int"
+  },
+  "function_table": {
+  },
+  "errors": [
+  ],
+  "warnings": [
+  ],
+  "output": "8\n"
+}
